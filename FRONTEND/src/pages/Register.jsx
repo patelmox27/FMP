@@ -75,5 +75,5 @@ const Register = () => {
     </div>
   );
 };
-//yes
+
 export default Register;
