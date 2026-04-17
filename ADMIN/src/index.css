@@ -1,0 +1,62 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  background-color: #0a0c11;
+  color: #e2e8f0;
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Scrollbar ─────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #111420; }
+::-webkit-scrollbar-thumb { background: #252a3d; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #6c63ff; }
+
+/* ── Glass card ─────────────────── */
+.glass-card {
+  background: rgba(28, 32, 48, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(37, 42, 61, 0.8);
+  border-radius: 16px;
+}
+
+/* ── Gradient border ─────────────── */
+.gradient-border {
+  position: relative;
+  border-radius: 16px;
+  background: linear-gradient(#1c2030, #1c2030) padding-box,
+              linear-gradient(135deg, #6c63ff, #00e5a0) border-box;
+  border: 1.5px solid transparent;
+}
+
+/* ── Shimmer skeleton ──────────────── */
+.skeleton {
+  background: linear-gradient(90deg, #1c2030 25%, #252a3d 50%, #1c2030 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* ── Active nav item ─────────────── */
+.nav-active {
+  background: linear-gradient(90deg, rgba(108,99,255,0.2), transparent);
+  border-left: 3px solid #6c63ff;
+  color: #8b85ff;
+}
+
+/* ── Stat card hover ─────────────── */
+.stat-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(108, 99, 255, 0.15);
+}
