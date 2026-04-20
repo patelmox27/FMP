@@ -17,6 +17,12 @@ const slotSchema = new mongoose.Schema({
     enum: ["regular", "ev", "handicap"]
   },
 
+  vehicleCategory: {
+    type: String,
+    enum: ["car", "bike"],
+    default: "car"
+  },
+
   status: {
     type: String,
     enum: ["available", "reserved", "occupied"],

@@ -127,7 +127,7 @@ const deleteParkingLot = async (req, res) => {
 // 🅿️ CREATE SLOTS
 const createSlots = async (req, res) => {
   try {
-    const { parkingLotId, numberOfSlots, slotType } = req.body;
+    const { parkingLotId, numberOfSlots, slotType, vehicleCategory } = req.body;
 
     if (!parkingLotId || !numberOfSlots) {
       return res.status(400).json({
@@ -150,6 +150,7 @@ const createSlots = async (req, res) => {
         parkingLotId,
         slotNumber: `S${i}`,
         slotType: slotType || "regular",
+        vehicleCategory: vehicleCategory || "car",
         status: "available",
       });
     }
@@ -196,7 +197,7 @@ const getSlotsByParkingLot = async (req, res) => {
 };
 const updateSlot = async (req, res) => {
   try {
-    const { slotNumber, slotType, status } = req.body;
+    const { slotNumber, slotType, status, vehicleCategory } = req.body;
 
     const slot = await Slot.findById(req.params.id);
 
@@ -209,6 +210,7 @@ const updateSlot = async (req, res) => {
     // update fields (only if provided)
     if (slotNumber) slot.slotNumber = slotNumber;
     if (slotType) slot.slotType = slotType;
+    if (vehicleCategory) slot.vehicleCategory = vehicleCategory;
     if (status) slot.status = status;
 
     await slot.save();

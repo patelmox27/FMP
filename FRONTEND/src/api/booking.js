@@ -20,3 +20,8 @@ export const updateBooking = async (bookingId, updateData) => {
   return response.data;
 };
 
+export const getBookingById = async (bookingId) => {
+  const response = await apiClient.get(`/booking/${bookingId}`);
+  return response.data;
+};
+

@@ -69,6 +69,7 @@ export default function ParkingLotsPage() {
     slotNumber: "",
     count: 1,
     slotType: "regular",
+    vehicleCategory: "car",
   });
 
   const selectedLot = useMemo(
@@ -114,6 +115,7 @@ export default function ParkingLotsPage() {
           acc[slot._id] = {
             status: slot.status || "available",
             slotType: slot.slotType || "regular",
+            vehicleCategory: slot.vehicleCategory || "car",
           };
           return acc;
         }, {}),
@@ -204,6 +206,7 @@ export default function ParkingLotsPage() {
       await updateSlot(slotId, {
         status: draft.status,
         slotType: draft.slotType,
+        vehicleCategory: draft.vehicleCategory,
       });
       await loadSlots(selectedLotId);
       await loadLots();
@@ -223,14 +226,16 @@ export default function ParkingLotsPage() {
         await addSlot(selectedLotId, {
           slotNumber: newSlotForm.slotNumber.trim(),
           slotType: newSlotForm.slotType,
+          vehicleCategory: newSlotForm.vehicleCategory,
         });
       } else {
         await bulkAddSlots(selectedLotId, {
           count: newSlotForm.count,
           slotType: newSlotForm.slotType,
+          vehicleCategory: newSlotForm.vehicleCategory,
         });
       }
-      setNewSlotForm({ slotNumber: "", count: 1, slotType: "regular" });
+      setNewSlotForm({ slotNumber: "", count: 1, slotType: "regular", vehicleCategory: "car" });
       await loadSlots(selectedLotId);
       await loadLots();
     } catch (err) {
@@ -662,6 +667,21 @@ export default function ParkingLotsPage() {
                   </div>
                   <div className="w-32">
                     <label className="mb-1 block text-[10px] uppercase font-bold text-on-surface-muted">
+                      Vehicle
+                    </label>
+                    <select
+                      value={newSlotForm.vehicleCategory}
+                      onChange={(e) =>
+                        setNewSlotForm((p) => ({ ...p, vehicleCategory: e.target.value }))
+                      }
+                      className="w-full rounded-xl border border-surface-border bg-surface-low px-3 py-2 text-sm text-on-surface outline-none focus:border-primary/60"
+                    >
+                      <option value="car">Car</option>
+                      <option value="bike">Bike</option>
+                    </select>
+                  </div>
+                  <div className="w-32">
+                    <label className="mb-1 block text-[10px] uppercase font-bold text-on-surface-muted">
                       Type
                     </label>
                     <select
@@ -720,7 +740,30 @@ export default function ParkingLotsPage() {
                       <Badge status={slot.status} />
                     </div>
 
-                    <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="mt-4 grid grid-cols-3 gap-3">
+                      <label className="text-xs text-on-surface-muted">
+                        Vehicle
+                        <select
+                          value={
+                            slotDrafts[slot._id]?.vehicleCategory ||
+                            slot.vehicleCategory ||
+                            "car"
+                          }
+                          onChange={(e) =>
+                            setSlotDrafts((prev) => ({
+                              ...prev,
+                              [slot._id]: {
+                                ...(prev[slot._id] || {}),
+                                vehicleCategory: e.target.value,
+                              },
+                            }))
+                          }
+                          className="mt-1 w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-sm text-on-surface outline-none"
+                        >
+                          <option value="car">Car</option>
+                          <option value="bike">Bike</option>
+                        </select>
+                      </label>
                       <label className="text-xs text-on-surface-muted">
                         Status
                         <select

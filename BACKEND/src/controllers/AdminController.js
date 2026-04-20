@@ -403,7 +403,7 @@ const updateSlot = async (req, res) => {
 const addSlot = async (req, res) => {
   try {
     const { lotId } = req.params;
-    const { slotNumber, slotType } = req.body;
+    const { slotNumber, slotType, vehicleCategory } = req.body;
 
     const lot = await ParkingLot.findById(lotId);
     if (!lot) return res.status(404).json({ message: "Parking lot not found" });
@@ -412,6 +412,7 @@ const addSlot = async (req, res) => {
       parkingLotId: lotId,
       slotNumber,
       slotType,
+      vehicleCategory: vehicleCategory || "car",
       status: "available",
     });
 
@@ -454,7 +455,7 @@ const deleteSlot = async (req, res) => {
 const bulkAddSlots = async (req, res) => {
   try {
     const { lotId } = req.params;
-    const { count, slotType } = req.body;
+    const { count, slotType, vehicleCategory } = req.body;
     const numCount = Number(count);
 
     if (!numCount || numCount <= 0) {
@@ -491,6 +492,7 @@ const bulkAddSlots = async (req, res) => {
         parkingLotId: lotId,
         slotNumber: `${prefix}${maxNum + i}`,
         slotType: slotType || "regular",
+        vehicleCategory: vehicleCategory || "car",
         status: "available",
       });
     }

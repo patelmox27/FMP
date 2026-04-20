@@ -6,7 +6,7 @@ const Notification = require("../models/NotificationModel");
 // ➕ CREATE BOOKING (RESERVE SLOT)
 const createBooking = async (req, res) => {
   try {
-    const { userId, slotId, vehicleId, startTime, endTime, reservationType } =
+    const { userId, slotId, vehicleId, startTime, endTime, reservationType, vehicleCategory } =
       req.body;
 
     if (!userId || !slotId || !vehicleId || !startTime || !endTime) {
@@ -23,14 +23,40 @@ const createBooking = async (req, res) => {
       });
     }
 
-    // check availability
-    if (slot.status !== "available") {
+    // check vehicle category match
+    if (vehicleCategory && slot.vehicleCategory && slot.vehicleCategory !== vehicleCategory) {
       return res.status(400).json({
-        message: "Slot is not available",
+        message: `This slot is reserved for ${slot.vehicleCategory.replace('_', ' ')}s only.`,
       });
     }
 
-    // calc duration and price
+    // prevent time overlaps for the same slot
+    const requestedStart = new Date(startTime);
+    const requestedEnd = new Date(endTime);
+    
+    if (requestedStart >= requestedEnd) {
+      return res.status(400).json({ message: "End time must be after start time." });
+    }
+
+    const conflictingReservation = await Reservation.findOne({
+      slotId,
+      status: "active",
+      $or: [
+        { startTime: { $lt: requestedEnd }, endTime: { $gt: requestedStart } }
+      ]
+    });
+
+    if (conflictingReservation) {
+      return res.status(400).json({
+        message: "This slot is already booked for the selected time period.",
+      });
+    }
+
+    // Note: We no longer strictly reject if `slot.status !== 'available'` because
+    // the slot might be 'reserved' right now, but the user is booking it for TOMORROW.
+    // The overlap check above guarantees they aren't double-booking the exact time.
+
+    // check if vehicle is already parked
     const parking = await Parking.findById(slot.parkingLotId);
     let totalPrice = 0;
     if (parking) {
@@ -138,7 +164,7 @@ const getBookingById = async (req, res) => {
   try {
     const booking = await Reservation.findById(req.params.id)
       .populate("userId", "Name email")
-      .populate("slotId")
+      .populate({ path: "slotId", populate: { path: "parkingLotId" } })
       .populate("vehicleId");
 
     if (!booking) {
@@ -163,7 +189,7 @@ const getBookingById = async (req, res) => {
 const getBookingsByUser = async (req, res) => {
   try {
     const bookings = await Reservation.find({ userId: req.params.userId })
-      .populate("slotId")
+      .populate({ path: "slotId", populate: { path: "parkingLotId" } })
       .populate("vehicleId");
 
     res.status(200).json({

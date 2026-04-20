@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Calendar, 
   Clock, 
@@ -16,6 +17,7 @@ import { getBookingsByUser, cancelBooking, updateBooking } from '../api/booking'
 import { getPaymentsByUser } from '../api/payment';
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('bookings'); // 'bookings' or 'payments'
   const [bookings, setBookings] = useState([]);
   const [payments, setPayments] = useState([]);
@@ -229,13 +231,20 @@ const Dashboard = () => {
                                href={`https://www.google.com/maps/dir/?api=1&destination=${dest}`}
                                target="_blank"
                                rel="noopener noreferrer"
-                               className="px-5 py-2.5 rounded-xl bg-primary/20 border border-primary/30 text-primary font-bold text-sm hover:bg-primary hover:text-white transition-colors shadow-sm flex items-center gap-2"
+                               className="px-5 py-2.5 rounded-xl bg-primary/20 border border-primary/30 text-primary font-bold text-sm hover:bg-primary hover:text-white transition-colors shadow-sm flex items-center gap-2 hidden lg:flex"
                              >
                                <MapPin className="h-4 w-4" />
                                Navigate
                              </a>
                            );
                          })()}
+                         
+                         <button 
+                           onClick={() => navigate(`/ticket/${booking._id}`)}
+                           className="px-5 py-2.5 rounded-xl bg-primary text-white font-bold text-sm hover:bg-primary/90 transition-colors shadow-sm"
+                         >
+                           View Pass
+                         </button>
                          
                          <button 
                            onClick={() => handleExtendReservation(booking._id)}

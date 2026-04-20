@@ -42,6 +42,58 @@ const initCronJobs = (io) => {
     }
   });
 
+  // 🕒 EVERY 1 MINUTE: Auto-Release Expired Reservations
+  cron.schedule("* * * * *", async () => {
+    try {
+      const now = new Date();
+      const expiredReservations = await Reservation.find({
+        status: "active",
+        endTime: { $lt: now },
+      });
+
+      for (const resv of expiredReservations) {
+        // Mark reservation as completed
+        resv.status = "completed";
+        await resv.save();
+
+        // Free the slot
+        const slot = await Slot.findById(resv.slotId);
+        if (slot) {
+          slot.status = "available";
+          await slot.save();
+
+          // Notify User
+          const notification = await Notification.create({
+            userId: resv.userId,
+            message: `Your reservation has expired. Slot ${slot.slotNumber} is now available.`,
+            type: "reservation",
+          });
+
+          if (io) {
+            io.to(resv.userId.toString()).emit("newNotification", notification);
+            // Broadcast slot update
+            io.emit("slotUpdated", {
+              slotId: slot._id,
+              status: slot.status,
+              parkingLotId: slot.parkingLotId,
+            });
+          }
+
+          // Update available count
+          const totalAvailable = await Slot.countDocuments({
+            parkingLotId: slot.parkingLotId,
+            status: "available",
+          });
+          await ParkingLot.findByIdAndUpdate(slot.parkingLotId, {
+            availableSlots: totalAvailable,
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Cron Error (Auto-Release):", err.message);
+    }
+  });
+
   // 🕒 EVERY 5 MINUTES: Check for unauthorized parking 
   // (Slot 'occupied' but no active reservation associated with it)
   cron.schedule("*/5 * * * *", async () => {

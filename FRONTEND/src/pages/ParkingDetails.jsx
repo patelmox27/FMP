@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { getSlotsByParkingLot, getParkingLotById } from '../api/parking';
 import { createBooking } from '../api/booking';
 import { createPaymentOrder, verifyPaymentSignature } from '../api/payment';
 import io from 'socket.io-client';
-import { QRCodeCanvas } from 'qrcode.react';
 
 const ParkingDetails = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [lot, setLot] = useState(null);
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -15,7 +15,13 @@ const ParkingDetails = () => {
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [bookingStatus, setBookingStatus] = useState(null);
   const [reservationType, setReservationType] = useState('hourly'); // Added type state
+  const [selectedVehicleType, setSelectedVehicleType] = useState('car'); // Added vehicle type state
   const [ticketData, setTicketData] = useState(null);
+
+  // Dynamic Time Selection State
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedTime, setSelectedTime] = useState(new Date().toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' }).slice(0,5));
+  const [durationValue, setDurationValue] = useState(1);
   const [currentBooking, setCurrentBooking] = useState(null);
 
   // ✨ WebSockets for Live Updates
@@ -79,10 +85,22 @@ const ParkingDetails = () => {
         } catch (e) {}
       }
 
-      // Compute simple dummy endTime for visuals based on type
-      let durationHours = 2; // default hourly block
-      if (reservationType === 'daily') durationHours = 24;
-      if (reservationType === 'monthly') durationHours = 24 * 30;
+      // Compute exact startTime and endTime
+      const startDateTime = new Date(`${selectedDate}T${selectedTime}:00`);
+      if (startDateTime < new Date(Date.now() - 5 * 60000)) { // Allow 5 minutes of grace
+         alert("Cannot book a time in the past.");
+         setBookingStatus(null);
+         return;
+      }
+
+      let endDateTime = new Date(startDateTime);
+      if (reservationType === 'hourly') {
+        endDateTime.setHours(endDateTime.getHours() + Number(durationValue));
+      } else if (reservationType === 'daily') {
+        endDateTime.setDate(endDateTime.getDate() + Number(durationValue));
+      } else if (reservationType === 'monthly') {
+        endDateTime.setMonth(endDateTime.getMonth() + Number(durationValue));
+      }
 
       let createdBooking = currentBooking;
 
@@ -91,9 +109,10 @@ const ParkingDetails = () => {
           userId,
           slotId: selectedSlot._id,
           vehicleId: "6612d6a4c21e646274b7c124", 
-          reservationType: reservationType, // passing new field
-          startTime: new Date().toISOString(),
-          endTime: new Date(Date.now() + durationHours * 60 * 60 * 1000).toISOString(),
+          reservationType: reservationType, 
+          vehicleCategory: selectedVehicleType, 
+          startTime: startDateTime.toISOString(),
+          endTime: endDateTime.toISOString(),
         };
 
         const bookingResponse = await createBooking(bookingData);
@@ -129,22 +148,9 @@ const ParkingDetails = () => {
             
             // Payment Success Block
             setBookingStatus('success');
-            setTicketData({
-              reservationId: createdBooking._id,
-              slotNumber: selectedSlot.slotNumber,
-              type: reservationType,
-              createdAt: new Date().toISOString()
-            });
-
-            // Note: Optimistic UI update is no longer strictly necessary if Sockets are fast, 
-            // but we can keep it inside for zero-latency feedback on local client.
-            const newSlots = [...slots];
-            const slotIndex = newSlots.findIndex(s => s._id === selectedSlot._id);
-            if (slotIndex !== -1) {
-              newSlots[slotIndex].status = "reserved";
-              setSlots(newSlots);
-            }
-            // Removed setTimeout so the user can look at their QR code endlessly until manual dismissal
+            
+            // Redirect to the dedicated Ticket page
+            navigate('/ticket/' + createdBooking._id);
 
           } catch (err) {
             console.error("Payment Verification Error:", err);
@@ -207,8 +213,43 @@ const ParkingDetails = () => {
             </div>
           </div>
 
+          {/* Vehicle Type Selector */}
+          <div className="mb-6 flex justify-center">
+            <div className="bg-surface-lowest rounded-full p-1 border border-outline-variant/20 flex gap-1 shadow-sm">
+              {['car', 'bike'].map((type) => (
+                <button
+                  key={type}
+                  onClick={() => {
+                    setSelectedVehicleType(type);
+                    setSelectedSlot(null); // Reset selection when changing type
+                    setCurrentBooking(null);
+                  }}
+                  className={`px-6 py-2.5 rounded-full text-sm font-bold uppercase tracking-wider transition-all duration-300 ${
+                    selectedVehicleType === type 
+                      ? 'bg-primary text-white shadow-md shadow-primary/20 scale-105' 
+                      : 'text-tertiary hover:bg-surface-highest hover:text-on-surface'
+                  }`}
+                >
+                  {type.replace('_', ' ')}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-5 xl:grid-cols-6 gap-4 mt-8">
-            {slots.map(slot => {
+            {slots.filter(s => (s.vehicleCategory || 'car') === selectedVehicleType).length === 0 && slots.length > 0 ? (
+              <div className="col-span-full text-center text-tertiary py-16 border border-dashed border-outline-variant/30 rounded-2xl bg-surface-lowest">
+                <div className="text-4xl mb-4 opacity-50">🚫</div>
+                <h3 className="font-display text-xl font-bold mb-2">No {selectedVehicleType.replace('_', ' ').toUpperCase()} Parking</h3>
+                <p>There is no parking for {selectedVehicleType.replace('_', ' ')} in this lot.</p>
+              </div>
+            ) : slots.length === 0 ? (
+              <div className="col-span-full text-center text-tertiary py-12 border border-dashed border-outline-variant/30 rounded-xl">
+                No telemetry available for this monolith layout.
+              </div>
+            ) : slots
+              .filter(slot => (slot.vehicleCategory || 'car') === selectedVehicleType)
+              .map(slot => {
               const isAvailable = slot.status === 'available';
               const isOccupied = slot.status === 'occupied';
               const isSelected = selectedSlot?._id === slot._id;
@@ -239,11 +280,6 @@ const ParkingDetails = () => {
                 </button>
               );
             })}
-            {slots.length === 0 && (
-              <div className="col-span-full text-center text-tertiary py-12 border border-dashed border-outline-variant/30 rounded-xl">
-                No telemetry available for this monolith layout.
-              </div>
-            )}
           </div>
         </div>
 
@@ -259,74 +295,11 @@ const ParkingDetails = () => {
               </div>
             ) : (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 flex flex-col h-full">
-             // Dynamic View Area
-             (bookingStatus === 'success' && ticketData) ? (
-                <div className="flex flex-col items-center py-4 h-full overflow-y-auto" style={{scrollbarWidth: 'none'}}>
-                  <h3 className="font-display text-2xl text-primary mb-4 font-bold tracking-wide leading-tight text-center">Booking <br /> Confirmed</h3>
-                  <div className="bg-[#e2e2e8] p-3 rounded-xl shadow-[0_0_20px_theme(colors.primary.container)] mb-2 shrink-0">
-                    <QRCodeCanvas 
-                      value={JSON.stringify(ticketData)} 
-                      size={140} 
-                      bgColor={"#e2e2e8"} 
-                      fgColor={"#0a0a0c"} 
-                      includeMargin={true}
-                    />
-                  </div>
-                  <p className="text-tertiary text-[10px] text-center uppercase tracking-[0.2em] font-bold mb-6">Present at terminal camera</p>
-
-                  {/* Booking Info Card */}
-                  <div className="w-full bg-surface-highest rounded-2xl p-5 mb-6 border border-outline-variant/10">
-                    <div className="space-y-3 text-sm">
-                      <div className="flex justify-between items-center pb-2 border-b border-outline-variant/10">
-                        <span className="text-tertiary">Location</span>
-                        <span className="font-bold text-on-surface text-right w-40 truncate">{lot?.name}</span>
-                      </div>
-                      <div className="flex justify-between items-center pb-2 border-b border-outline-variant/10">
-                        <span className="text-tertiary">Slot Number</span>
-                        <span className="font-bold text-on-surface">{selectedSlot?.slotNumber} <span className="text-[10px] uppercase text-tertiary">({reservationType})</span></span>
-                      </div>
-                      <div className="flex justify-between items-center pb-2 border-b border-outline-variant/10">
-                        <span className="text-tertiary">Amount Paid</span>
-                        <span className="font-bold text-secondary text-lg">₹{currentBooking?.totalPrice || '?'}</span>
-                      </div>
-                      <div className="flex justify-between items-start pt-1">
-                        <span className="text-tertiary">Time Block</span>
-                        <div className="text-right">
-                          <div className="font-bold text-on-surface">
-                            {currentBooking?.startTime ? new Date(currentBooking.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Now'}
-                          </div>
-                          <div className="text-xs text-tertiary">
-                            to {currentBooking?.endTime ? new Date(currentBooking.endTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'End'}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-3 w-full mt-auto">
-                    {(() => {
-                        const destination = lot?.coordinates?.lat && lot?.coordinates?.lng 
-                          ? `${lot.coordinates.lat},${lot.coordinates.lng}` 
-                          : encodeURIComponent(lot?.address || lot?.name);
-                        return (
-                          <a 
-                            href={`https://www.google.com/maps/dir/?api=1&destination=${destination}`} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="w-full py-3 rounded-full font-bold text-sm text-center bg-primary/20 text-primary border border-primary/30 hover:bg-primary hover:text-white transition-all flex justify-center items-center gap-2 shadow-lg shadow-primary/10 hover:shadow-primary/30"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>
-                            Navigate to Location
-                          </a>
-                        );
-                    })()}
-                    <button 
-                      onClick={() => { setSelectedSlot(null); setBookingStatus(null); setTicketData(null); setCurrentBooking(null); }} 
-                      className="w-full py-3 text-secondary text-[11px] uppercase font-bold tracking-[0.1em] hover:bg-surface-bright rounded-full transition-all border border-transparent hover:border-surface-variant"
-                    >
-                      Return to Map
-                    </button>
-                  </div>
+             {bookingStatus === 'success' ? (
+                <div className="flex flex-col items-center justify-center py-16 h-full">
+                  <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mb-6"></div>
+                  <h3 className="font-display text-2xl text-primary font-bold tracking-wide">Securing Pass...</h3>
+                  <p className="text-tertiary mt-2 text-sm">Redirecting to your active ticket.</p>
                 </div>
               ) : (
                 <>
@@ -352,27 +325,69 @@ const ParkingDetails = () => {
                 </div>
 
                 {/* Reservation Types */}
-                <div className="mb-10">
+                <div className="mb-6">
                   <span className="text-tertiary uppercase text-xs tracking-wider font-bold block mb-3">Reservation Block</span>
                   <div className="grid grid-cols-3 gap-2">
                     <button 
-                      onClick={() => setReservationType('hourly')} 
+                      onClick={() => { setReservationType('hourly'); setDurationValue(1); }} 
                       className={`py-3 px-2 text-xs font-bold rounded-xl transition-all border ${reservationType === 'hourly' ? 'bg-primary/20 border-primary text-primary' : 'border-outline-variant/20 text-tertiary hover:border-outline-variant/50'}`}
                     >
                       Hourly
                     </button>
                     <button 
-                      onClick={() => setReservationType('daily')} 
+                      onClick={() => { setReservationType('daily'); setDurationValue(1); }} 
                       className={`py-3 px-2 text-xs font-bold rounded-xl transition-all border ${reservationType === 'daily' ? 'bg-primary/20 border-primary text-primary' : 'border-outline-variant/20 text-tertiary hover:border-outline-variant/50'}`}
                     >
                       Daily
                     </button>
                     <button 
-                      onClick={() => setReservationType('monthly')} 
+                      onClick={() => { setReservationType('monthly'); setDurationValue(1); }} 
                       className={`py-3 px-2 text-xs font-bold rounded-xl transition-all border ${reservationType === 'monthly' ? 'bg-primary/20 border-primary text-primary' : 'border-outline-variant/20 text-tertiary hover:border-outline-variant/50'}`}
                     >
                       Monthly
                     </button>
+                  </div>
+                </div>
+
+                {/* Dynamic Time Selection */}
+                <div className="mb-10 bg-surface-lowest p-4 rounded-2xl border border-outline-variant/10">
+                  <div className="flex flex-col gap-4">
+                    <div className="flex gap-4">
+                      <div className="flex-1">
+                        <label className="text-[10px] text-tertiary uppercase font-bold tracking-wider mb-1 block">Start Date</label>
+                        <input 
+                          type="date" 
+                          min={new Date().toISOString().split('T')[0]}
+                          value={selectedDate}
+                          onChange={(e) => setSelectedDate(e.target.value)}
+                          className="w-full bg-surface-card border border-outline-variant/20 rounded-xl px-3 py-2 text-sm text-on-surface outline-none focus:border-primary/50"
+                        />
+                      </div>
+                      {reservationType === 'hourly' && (
+                        <div className="flex-1">
+                          <label className="text-[10px] text-tertiary uppercase font-bold tracking-wider mb-1 block">Start Time</label>
+                          <input 
+                            type="time" 
+                            value={selectedTime}
+                            onChange={(e) => setSelectedTime(e.target.value)}
+                            className="w-full bg-surface-card border border-outline-variant/20 rounded-xl px-3 py-2 text-sm text-on-surface outline-none focus:border-primary/50"
+                          />
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-tertiary uppercase font-bold tracking-wider mb-1 block">
+                        Duration ({reservationType === 'hourly' ? 'Hours' : reservationType === 'daily' ? 'Days' : 'Months'})
+                      </label>
+                      <input 
+                        type="number" 
+                        min="1"
+                        max={reservationType === 'hourly' ? 24 : reservationType === 'daily' ? 30 : 12}
+                        value={durationValue}
+                        onChange={(e) => setDurationValue(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-full bg-surface-card border border-outline-variant/20 rounded-xl px-3 py-2 text-sm text-on-surface outline-none focus:border-primary/50"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -390,7 +405,7 @@ const ParkingDetails = () => {
                    'Initialize Booking'}
                 </button>
                 </>
-              )
+              )}
               </div>
             )}
           </div>

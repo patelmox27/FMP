@@ -7,6 +7,7 @@ import Register from './pages/Register';
 import Parking from './pages/Parking';
 import ParkingDetails from './pages/ParkingDetails';
 import Dashboard from './pages/Dashboard';
+import Ticket from './pages/Ticket';
 
 // Admin Pages
 
@@ -37,6 +38,7 @@ function App() {
             <Route path="/parking" element={<Parking />} />
             <Route path="/parking/:id" element={<ParkingDetails />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/ticket/:id" element={<Ticket />} />
             
             {/* Admin Routes */}
             <Route path="/admin/lots" element={<AdminLots />} />
