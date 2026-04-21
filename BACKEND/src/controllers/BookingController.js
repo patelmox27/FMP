@@ -9,7 +9,7 @@ const createBooking = async (req, res) => {
     const { userId, slotId, vehicleId, startTime, endTime, reservationType, vehicleCategory } =
       req.body;
 
-    if (!userId || !slotId || !vehicleId || !startTime || !endTime) {
+    if (!userId || !slotId || !startTime || !endTime) {
       return res.status(400).json({
         message: "All fields are required",
       });

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { 
   Calendar, 
   Clock, 
@@ -8,7 +9,6 @@ import {
   XCircle, 
   CheckCircle2, 
   ChevronRight,
-  TrendingDown,
   TrendingUp,
   ArrowRight,
   AlertCircle
@@ -18,12 +18,15 @@ import { getPaymentsByUser } from '../api/payment';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('bookings'); // 'bookings' or 'payments'
+  const [activeTab, setActiveTab] = useState('bookings');
   const [bookings, setBookings] = useState([]);
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [user, setUser] = useState(null);
+  // Inline extend reservation state
+  const [extendBookingId, setExtendBookingId] = useState(null);
+  const [extendHours, setExtendHours] = useState(1);
 
   useEffect(() => {
     const userData = JSON.parse(localStorage.getItem('user'));
@@ -54,27 +57,56 @@ const Dashboard = () => {
   };
 
   const handleCancelReservation = async (id) => {
-    if (!window.confirm("Are you sure you want to cancel this reservation?")) return;
-    try {
-      await cancelBooking(id);
-      fetchData(user._id);
-    } catch (err) {
-      alert("Failed to cancel reservation");
-    }
+    toast(
+      (t) => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <span style={{ fontWeight: 600 }}>Cancel this reservation?</span>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              onClick={async () => {
+                toast.dismiss(t.id);
+                try {
+                  await cancelBooking(id);
+                  toast.success('Reservation cancelled.');
+                  fetchData(user._id);
+                } catch {
+                  toast.error('Failed to cancel reservation.');
+                }
+              }}
+              style={{ padding: '0.3rem 0.9rem', borderRadius: '0.5rem', background: '#ef4444', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 700 }}
+            >
+              Yes, Cancel
+            </button>
+            <button
+              onClick={() => toast.dismiss(t.id)}
+              style={{ padding: '0.3rem 0.9rem', borderRadius: '0.5rem', background: 'transparent', color: '#e2e2e8', border: '1px solid #444', cursor: 'pointer' }}
+            >
+              Keep It
+            </button>
+          </div>
+        </div>
+      ),
+      { duration: 8000 }
+    );
   };
 
   const handleExtendReservation = async (id) => {
-    const extensionHours = prompt("Enter additional hours to extend:", "1");
-    if (!extensionHours || isNaN(extensionHours)) return;
+    setExtendBookingId(id);
+    setExtendHours(1);
+  };
 
-    const booking = bookings.find(b => b._id === id);
-    const newEndTime = new Date(new Date(booking.endTime).getTime() + (extensionHours * 60 * 60 * 1000));
-
+  const confirmExtend = async () => {
+    const hours = Number(extendHours);
+    if (!hours || hours < 1) { toast.error('Enter at least 1 hour.'); return; }
+    const booking = bookings.find(b => b._id === extendBookingId);
+    const newEndTime = new Date(new Date(booking.endTime).getTime() + hours * 60 * 60 * 1000);
     try {
-      await updateBooking(id, { endTime: newEndTime });
+      await updateBooking(extendBookingId, { endTime: newEndTime });
+      toast.success(`Reservation extended by ${hours}h.`);
+      setExtendBookingId(null);
       fetchData(user._id);
-    } catch (err) {
-      alert("Failed to extend reservation");
+    } catch {
+      toast.error('Failed to extend reservation.');
     }
   };
 
@@ -246,12 +278,39 @@ const Dashboard = () => {
                            View Pass
                          </button>
                          
-                         <button 
-                           onClick={() => handleExtendReservation(booking._id)}
-                           className="px-5 py-2.5 rounded-xl border border-surface-variant font-bold text-sm hover:bg-surface-hover transition-colors"
-                         >
-                           Extend
-                         </button>
+                         {extendBookingId === booking._id ? (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                min="1"
+                                max="24"
+                                value={extendHours}
+                                onChange={e => setExtendHours(Math.max(1, parseInt(e.target.value) || 1))}
+                                className="w-16 px-2 py-1.5 rounded-lg bg-surface-low border border-outline-variant/30 text-sm text-center text-on-surface outline-none focus:border-primary/60"
+                              />
+                              <span className="text-xs text-tertiary">hrs</span>
+                              <button
+                                onClick={confirmExtend}
+                                className="px-3 py-1.5 rounded-lg bg-primary text-white font-bold text-xs"
+                              >
+                                Confirm
+                              </button>
+                              <button
+                                onClick={() => setExtendBookingId(null)}
+                                className="px-3 py-1.5 rounded-lg border border-surface-variant text-xs text-tertiary"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ) : (
+                            <button 
+                              onClick={() => handleExtendReservation(booking._id)}
+                              className="px-5 py-2.5 rounded-xl border border-surface-variant font-bold text-sm hover:bg-surface-hover transition-colors"
+                            >
+                              Extend
+                            </button>
+                          )}
+                         
                          <button 
                            onClick={() => handleCancelReservation(booking._id)}
                            className="px-5 py-2.5 rounded-xl bg-accent-red/10 text-accent-red font-bold text-sm hover:bg-accent-red hover:text-white transition-all shadow-sm"

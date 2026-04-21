@@ -85,6 +85,15 @@ app.get("/test", (req, res) => {
   res.send("Server working");
 });
 
+// Health Check Route
+app.get(["/health", "/api/health"], (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
 // Start Server
 const PORT = process.env.PORT || 3001; // ✅ your backend port
 

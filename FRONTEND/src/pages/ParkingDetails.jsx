@@ -77,13 +77,16 @@ const ParkingDetails = () => {
 
     try {
       const userStr = localStorage.getItem('user');
-      let userId = "6612d6a4c21e646274b7c123";
-      if (userStr) {
-        try {
-          const user = JSON.parse(userStr);
-          userId = user._id || user.id || userId;
-        } catch (e) {}
+      if (!userStr) {
+        alert("Session expired. Please log in again.");
+        setBookingStatus(null);
+        return;
       }
+
+      const parsedUser = JSON.parse(userStr);
+      const userId = parsedUser._id || parsedUser.id;
+      // vehicleId: use user's primary vehicle if present, otherwise let backend accept without it
+      const vehicleId = parsedUser.vehicleId || parsedUser.vehicle?._id || userId; // fallback to userId so backend doesn't crash
 
       // Compute exact startTime and endTime
       const startDateTime = new Date(`${selectedDate}T${selectedTime}:00`);
@@ -108,9 +111,8 @@ const ParkingDetails = () => {
         const bookingData = {
           userId,
           slotId: selectedSlot._id,
-          vehicleId: "6612d6a4c21e646274b7c124", 
-          reservationType: reservationType, 
-          vehicleCategory: selectedVehicleType, 
+          reservationType: reservationType,
+          vehicleCategory: selectedVehicleType,
           startTime: startDateTime.toISOString(),
           endTime: endDateTime.toISOString(),
         };
@@ -130,7 +132,7 @@ const ParkingDetails = () => {
       
       // Step 3: Open Razorpay checkout modal
       const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID || "rzp_test_SaZnNyZkZiGG6J",
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
         amount: order.amount,
         currency: order.currency,
         name: "Find My Parking",
